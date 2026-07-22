@@ -44,6 +44,7 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
   bool _isScanning = false;
   EligibilityResult? _lastResult;
   String? _errorMessage;
+  final TextEditingController _manualCardIdController = TextEditingController();
 
   @override
   void initState() {
@@ -91,6 +92,63 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
     }
   }
 
+  Future<void> _checkManualCardId() async {
+    final manualId = _manualCardIdController.text.trim();
+    if (manualId.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a card ID';
+      });
+      return;
+    }
+
+    setState(() {
+      _isScanning = true;
+      _errorMessage = null;
+      _lastResult = null;
+    });
+
+    try {
+      final userData = await SupabaseService.instance.getUserByCardUid(manualId);
+      
+      if (userData == null) {
+        setState(() {
+          _lastResult = EligibilityResult(
+            isEligible: false,
+            status: EligibilityStatus.userNotFound,
+            message: 'User not found for card ID: $manualId',
+            cardUid: manualId,
+            balance: null,
+          );
+          _isScanning = false;
+        });
+        return;
+      }
+
+      final balance = userData['balance'];
+      final balanceValue = balance is num ? balance.toDouble() : 0.0;
+      final isEligible = balanceValue >= 100.0;
+
+      setState(() {
+        _lastResult = EligibilityResult(
+          isEligible: isEligible,
+          status: isEligible ? EligibilityStatus.eligible : EligibilityStatus.insufficientBalance,
+          message: isEligible 
+              ? 'Eligible - Balance: ${balanceValue.toStringAsFixed(2)} birr'
+              : 'Not Eligible - Balance: ${balanceValue.toStringAsFixed(2)} birr (Minimum: 100 birr)',
+          cardUid: manualId,
+          balance: balanceValue,
+          userName: userData['name'] as String?,
+        );
+        _isScanning = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Check failed: ${e.toString()}';
+        _isScanning = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,6 +188,47 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
+              // Manual Card ID Input for debugging
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Debug: Manual Card ID Check',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _manualCardIdController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter NFC card ID manually',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: _isScanning ? null : _checkManualCardId,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Colors.grey[700],
+                      ),
+                      child: const Text('Check Manual ID'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
               if (_errorMessage != null) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -261,6 +360,7 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
   @override
   void dispose() {
     _eligibilityChecker.dispose();
+    _manualCardIdController.dispose();
     super.dispose();
   }
 }
