@@ -9,7 +9,7 @@ void main() async {
   
   // Initialize Supabase - REPLACE WITH YOUR ACTUAL CREDENTIALS
   await Supabase.initialize(
-    url: 'sb_publishable_qyT7AgGtif5eskSyeFVCvg_kxS1KfWM',
+    url: 'https://flevnphtltfanarrluyt.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsZXZucGh0bHRmYW5hcnJsdXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MTQ3ODUsImV4cCI6MjA5Nzk5MDc4NX0.jLRysC70Hr1I3IXfS9JhWtRO3mzRtMRaA2QezfqNTk0',
   );
   
@@ -108,7 +108,11 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
     });
 
     try {
+      print('Debug: Checking card ID: $manualId');
+      print('Debug: Supabase client initialized: ${Supabase.instance.client != null}');
+      
       final userData = await SupabaseService.instance.getUserByCardUid(manualId);
+      print('Debug: User data received: $userData');
       
       if (userData == null) {
         setState(() {
@@ -142,8 +146,49 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
         _isScanning = false;
       });
     } catch (e) {
+      print('Debug: Error occurred: $e');
       setState(() {
         _errorMessage = 'Check failed: ${e.toString()}';
+        _isScanning = false;
+      });
+    }
+  }
+
+  Future<void> _debugShowAllUsers() async {
+    setState(() {
+      _isScanning = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final users = await SupabaseService.instance.getAllUsers();
+      setState(() {
+        _errorMessage = 'Found ${users.length} users in database. Check console for details.';
+        _isScanning = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to fetch users: ${e.toString()}';
+        _isScanning = false;
+      });
+    }
+  }
+
+  Future<void> _debugCheckTables() async {
+    setState(() {
+      _isScanning = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await SupabaseService.instance.debugCheckTables();
+      setState(() {
+        _errorMessage = 'Table check complete. Check console for details.';
+        _isScanning = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to check tables: ${e.toString()}';
         _isScanning = false;
       });
     }
@@ -158,138 +203,158 @@ class _EligibilityCheckerScreenState extends State<EligibilityCheckerScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(
-                Icons.nfc,
-                size: 80,
-                color: Colors.blue,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Tap an NFC card to check eligibility',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.nfc,
+                  size: 80,
+                  color: Colors.blue,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Minimum balance: 100 birr',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+                const SizedBox(height: 24),
+                const Text(
+                  'Tap an NFC card to check eligibility',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              // Manual Card ID Input for debugging
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
+                const SizedBox(height: 8),
+                Text(
+                  'Minimum balance: 100 birr',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Debug: Manual Card ID Check',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _manualCardIdController,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter NFC card ID manually',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: _isScanning ? null : _checkManualCardId,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Colors.grey[700],
-                      ),
-                      child: const Text('Check Manual ID'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              if (_errorMessage != null) ...[
+                const SizedBox(height: 32),
+                // Manual Card ID Input for debugging
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red[50],
+                    color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[200]!),
+                    border: Border.all(color: Colors.grey[300]!),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
+                      const Text(
+                        'Debug: Manual Card ID Check',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _manualCardIdController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter NFC card ID manually',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _isScanning ? null : _checkManualCardId,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.grey[700],
+                        ),
+                        child: const Text('Check Manual ID'),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _isScanning ? null : _debugShowAllUsers,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.orange[700],
+                        ),
+                        child: const Text('Debug: Show All Users'),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _isScanning ? null : _debugCheckTables,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.red[700],
+                        ),
+                        child: const Text('Debug: Check Tables'),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-              ],
-              if (_lastResult != null) ...[
-                _buildResultCard(_lastResult!),
-                const SizedBox(height: 24),
-              ],
-              ElevatedButton(
-                onPressed: _isScanning ? null : _scanCard,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _isScanning
-                    ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
                           ),
-                          SizedBox(width: 12),
-                          Text('Scanning...'),
-                        ],
-                      )
-                    : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.nfc),
-                          SizedBox(width: 12),
-                          Text('Scan NFC Card'),
-                        ],
-                      ),
-              ),
-            ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                if (_lastResult != null) ...[
+                  _buildResultCard(_lastResult!),
+                  const SizedBox(height: 24),
+                ],
+                ElevatedButton(
+                  onPressed: _isScanning ? null : _scanCard,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isScanning
+                      ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Scanning...'),
+                          ],
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.nfc),
+                            SizedBox(width: 12),
+                            Text('Scan NFC Card'),
+                          ],
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
